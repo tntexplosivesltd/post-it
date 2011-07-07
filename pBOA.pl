@@ -125,7 +125,7 @@ sub on_public {
   }
 
   #!todo[ list] - print out list
-  elsif ($msg =~ /^!todo( list)? *(\d+)*/i) {
+  elsif ($msg =~ /^!todo( list)? *(\d+)?/i) {
     print "1: $1\n";
     print "2: $2\n";
     if ((-z "$nick.todo") || !(-e "$nick.todo")){
@@ -138,7 +138,7 @@ sub on_public {
         print "No cache found for $nick. Creating...\n";
         $#entries = -1;
         open(TODO, "<$nick.todo") || warn "Could not open todo file for reading: $!\n";
-        my $lines;
+        my $lines = 0;
         while(<TODO>) {
           my $line = $_;
           $entries[$lines] = $line;
