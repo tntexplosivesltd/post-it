@@ -24,10 +24,12 @@ my $ownernick = "thomas";
 my $password = "would you kindly";
 
 # logging flag
-my $log = 1;
 
 my ($gsec,$gmin,$ghour,$gmday,$gmon,$gyear,$gwday,$gyday,$gisdst) = localtime(time);
 my $fdate = sprintf("%04s-%02s-%02s", ($gyear + 1900), ($gmon + 1), $gmday);
+
+my @entries;
+my $cached;
 
 # Create the bot session.  The new() call specifies the events the bot
 # knows about and the functions that will handle those events.
@@ -93,7 +95,7 @@ sub on_join {
   my $nick = (split /!/, $_[ARG0])[0];
   my $channel = $_[ARG1];
   my $entry = "[$timestamp] $nick has joined $channel\n";
-  &add_to_log($entry, $channel)
+  print "$entry";
 }
 
 sub on_part {
@@ -102,7 +104,7 @@ sub on_part {
   my $nick = (split /!/, $_[ARG0])[0];
   my $channel = $_[ARG1];
   my $entry = "[$timestamp] $nick has left $channel\n";
-  &add_to_log($entry, $channel)
+  print "$entry";
 }
 
 # The bot has received a public message. Print and log it
@@ -110,6 +112,10 @@ sub on_public {
   my ($kernel, $who, $where, $msg) = @_[KERNEL, ARG0, ARG1, ARG2];
   my $nick    = (split /!/, $who)[0];
   my $channel = $where->[0];
+
+  #Commands for to-do list
+
+  #Add to list
   if ($msg =~ /^!todo add ([\W\w]+)/i) {
     open(TODO, ">>$nick.todo") || warn "Could not open todo file for writing: $!\n";
     print TODO "$1\n";
@@ -117,26 +123,63 @@ sub on_public {
     $irc->yield( privmsg => $channel => "Added!\n" );
     close(TODO);
   }
-  elsif (($msg =~ /^!todo list/i) || ($msg =~ /!todo *$/)) {
+
+  #!todo[ list] - print out list
+  elsif ($msg =~ /^!todo( list)? *(\d+)*/i) {
+    print "1: $1\n";
+    print "2: $2\n";
     if ((-z "$nick.todo") || !(-e "$nick.todo")){
       print "No todo list exists for $nick\n";
       $irc->yield( privmsg => $channel => "No todo list exists for $nick\n" );
     }
     else {
-      open(TODO, "<$nick.todo") || warn "Could not open todo file for reading: $!\n";
-      while(<TODO>) {
-        my $line = $_;
-        print "$nick: $line\n";
-        $irc->yield( privmsg => $channel => "$nick: $line\n" );
+      my $failed = 0;
+      if (!($cached eq $nick)) {
+        print "No cache found for $nick. Creating...\n";
+        $#entries = -1;
+        open(TODO, "<$nick.todo") || warn "Could not open todo file for reading: $!\n";
+        my $lines;
+        while(<TODO>) {
+          my $line = $_;
+          $entries[$lines] = $line;
+          $lines++;
+        }
+        close(TODO);
+        $cached = $nick;
+        print "Made cache for $nick\n";
       }
-      close(TODO);
+      my $num_entries = @entries;
+      if ($2) {
+        if (($2 > $num_entries) || ($2 < 0)) {
+          $irc->yield( privmsg => $channel => "$nick: Out of range\n" );
+          print "$nick: Out of range\n";
+        }
+        else {
+          my $i = $2;
+          $irc->yield( privmsg => $channel => "$nick: $i - $entries[$i]\n" );
+          print "$nick: $i $entries[$i]\n";
+        }
+      } 
+      else {
+        for (my $i = 0; $i < @entries; $i++) { 
+          if ($i > 4) {
+            $irc->yield( privmsg => $channel => "Too many entries. List has $num_entries entries\n" );
+            print "$nick Too many entries ($i)\n";
+            last;
+          }
+          else {
+            print "$nick: $entries[$i]";
+            $irc->yield( privmsg => $channel => "$nick: $i - $entries[$i]" );
+          }
+        }
+      }
     }
   }
   else {
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
     my $timestamp = sprintf("%02s:%02s:%02s", $hour, $min, $sec);
     my $entry = "[$timestamp] <$nick:$channel> $msg\n";
-    &add_to_log($entry, $channel)
+    print "$entry";
   }
 }
 
@@ -150,26 +193,7 @@ sub on_msg {
   my $timestamp = sprintf("%04s-%02s-%02s,%02s:%02s:%02s",($year + 1900), ($mon + 1), $mday, $hour, $min, $sec);
 
   if (($nick eq $ownernick) && ($msg =~ /$password/i)) {
-    if (($msg =~/logging[_ ]*off/i) && ($log == 1))  {
-      $log = 0;
-      print "Logging will now be turned off. Flushing file buffer...\n";
-      print CMDLOG "[$timestamp] Logging turned off\n";
-      my $ofh = select OUTPUT;
-      $| = 1;
-      print OUTPUT "";
-      $| = 0;
-      select $ofh;
-      $irc->yield( privmsg => $nick => "pBOA logging is now turned off\n" );
-    }
-
-    elsif (($msg =~/logging[_ ]*on/i) && ($log == 0)) {
-      $log = 1;
-      print "Logging will now be turned on\n";
-      print CMDLOG "[$timestamp] Logging turned on\n";
-      $irc->yield( privmsg => $nick => "pBOA logging is now turned on\n" );
-    }
-
-    elsif ($msg =~/join[_ ]*(\#\w+)/i) {
+     if ($msg =~/join[_ ]*(\#\w+)/i) {
       print "Trying to join $1\n";
       print CMDLOG "[$timestamp] Joined $1\n";
       $irc->yield( privmsg => $nick => "pBOA is trying to join $1\n" );
@@ -220,18 +244,7 @@ sub on_me {
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
   my $timestamp = sprintf("%02s:%02s:%02s", $hour, $min, $sec);
   my $entry = "[$timestamp]*  $nick $action\n";
-  &add_to_log($entry, $channel)
-}
-
-sub add_to_log {
-  my $to_add = $_[0];
-  my $channel = $_[1];
-  if ($log == 1) {
-    open(OUTPUT, ">>$channel\_$fdate.txt") || warn "Could not open log file: $!\n";
-    print OUTPUT "$to_add";
-    close(OUTPUT);
-  }
-  print "$to_add";
+  print "$entry";
 }
 
 close(OUTPUT);
