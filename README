@@ -1,1 +1,6 @@
-I am the woman - Thomas
+pBOA - the perl Bot Of Awesomeness
+Written by Thomas Phillips - tntexplosivesltd@yahoo.co.nz
+
+An IRC bot based on the POE framework. Controlled through sending private messages to him
+
+Note: Requires POE and POE::Component::IRC to be installed through CPAN
