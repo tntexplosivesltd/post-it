@@ -18,10 +18,10 @@ sub CHANNEL () { }
 # Create the component that will represent an IRC network.
 my ($irc) = POE::Component::IRC->spawn();
 
-my $nickname = "pBOA";
+my $nickname = "post-it";
 # The owner of the bot (me)
 my $ownernick = "thomas";
-my $password = "would you kindly";
+my $password = "";
 
 # logging flag
 
@@ -59,8 +59,8 @@ sub bot_start {
   $irc->yield(
     connect => {
       Nick     => $nickname,
-      Username => 'pBOA',
-      Ircname  => 'Perl Bot Of Awesomeness',
+      Username => 'postit',
+      Ircname  => 'postit',
       Server   => 'irc.segfault.net.nz',
       Port     => '6668',
     }
@@ -130,7 +130,7 @@ sub on_public {
     print "2: $2\n";
     if ((-z "$nick.todo") || !(-e "$nick.todo")){
       print "No todo list exists for $nick\n";
-      $irc->yield( privmsg => $channel => "No todo list exists for $nick\n" );
+      $irc->yield( privmsg => $nick => "No todo list exists for you\n" );
     }
     else {
       my $failed = 0;
@@ -151,25 +151,26 @@ sub on_public {
       my $num_entries = @entries;
       if ($2) {
         if (($2 > $num_entries) || ($2 < 0)) {
-          $irc->yield( privmsg => $channel => "$nick: Out of range\n" );
-          print "$nick: Out of range\n";
+          $irc->yield( privmsg => $nick => "Out of range" );
+          print "$nick: Out of range";
         }
         else {
-          my $i = $2;
-          $irc->yield( privmsg => $channel => "$nick: $i - $entries[$i]\n" );
-          print "$nick: $i $entries[$i]\n";
+          my $i = $2 - 1;
+          $irc->yield( privmsg => $nick => "$2 - $entries[$i]" );
+          print "$nick: $2 $entries[$i]";
         }
       } 
       else {
         for (my $i = 0; $i < @entries; $i++) { 
           if ($i > 4) {
-            $irc->yield( privmsg => $channel => "Too many entries. List has $num_entries entries\n" );
+            $irc->yield( privmsg => $nick => "List truncated. $num_entries entries in total\n" );
             print "$nick Too many entries ($i)\n";
             last;
           }
           else {
             print "$nick: $entries[$i]";
-            $irc->yield( privmsg => $channel => "$nick: $i - $entries[$i]" );
+            my $num = $i + 1;
+            $irc->yield( privmsg => $nick => "$num - $entries[$i]" );
           }
         }
       }
