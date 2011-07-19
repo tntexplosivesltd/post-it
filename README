@@ -1,4 +1,4 @@
-pBOA - the perl Bot Of Awesomeness
+post-it - a perl IRC to-do list bot
 Written by Thomas Phillips - tntexplosivesltd@yahoo.co.nz
 
 An IRC bot based on the POE framework. Controlled through sending private messages to him
