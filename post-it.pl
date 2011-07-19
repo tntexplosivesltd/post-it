@@ -15,12 +15,21 @@ use POE;
 use POE::Component::IRC;
 sub CHANNEL () { }
 
+my ($server, $port, $ownernick);
+print "Enter server\n";
+chomp($server=<STDIN>);
+print "Enter port\n";
+chomp($port=<STDIN>);
+print "Enter controlling user's nick\n";
+chomp($ownernick=<STDIN>);
+
+
+
 # Create the component that will represent an IRC network.
 my ($irc) = POE::Component::IRC->spawn();
 
 my $nickname = "post-it";
 # The owner of the bot (me)
-my $ownernick = "thomas";
 my $password = "";
 
 # logging flag
@@ -61,8 +70,8 @@ sub bot_start {
       Nick     => $nickname,
       Username => 'postit',
       Ircname  => 'postit',
-      Server   => 'irc.segfault.net.nz',
-      Port     => '6668',
+      Server   => $server,
+      Port     => $port,
     }
   );
 }
@@ -122,6 +131,9 @@ sub on_public {
     print "Added $1 to $nick\'s todo list\n";
     $irc->yield( privmsg => $channel => "Added!\n" );
     close(TODO);
+    if ($cached){
+      push(@entries, $1."\n");
+    }
   }
 
   #!todo[ list] - print out list
