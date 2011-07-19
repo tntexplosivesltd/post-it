@@ -1,7 +1,11 @@
 #######################################
 #######################################
 #                                     #
-# TODO: add removing and number limit #
+# TODO: add removing                  #
+# TODO: command line arguments        #
+# TODO: config file                   #
+# TODO: add method for commands       #
+# TODO: commands can be done by PM    #
 # s/$line//;                          #
 #                                     #
 #######################################
