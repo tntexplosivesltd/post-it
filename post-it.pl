@@ -115,7 +115,6 @@ sub on_connect {
   print "Successfully connected.\n";
   print "Connecting to $config{'channel'}\n";
   $irc->yield(join => $config{'channel'});
-  $todo{'lol'} = "haha";
 }
 
 sub on_disconnect {
@@ -136,7 +135,6 @@ sub on_public {
   my ($kernel, $who, $where, $msg) = @_[KERNEL, ARG0, ARG1, ARG2];
   if ($msg =~ /^!/)
   {
-    print join(":", split(/!/, $who))."\n";
     my @user = (split(/!/, $who));
     my $channel = $where->[0];
     my %info_to_pass = ('nick' => $user[0], 'ident' => $user[1], 'channel' => $channel, 'command' => $msg);
@@ -147,7 +145,6 @@ sub on_public {
 # The bot has recieved a private message. Parse it for commands
 sub on_msg {
   my ($kernel, $who, $where, $msg) = @_[KERNEL, ARG0, ARG1, ARG2];
-  print join(":", split(/!/, $who))."\n";
   my @user = (split(/!/, $who));
   my $channel = $where->[0];
   my %info_to_pass = ('nick' => $user[0], 'ident' => $user[1], 'channel' => $channel, 'command' => $msg);
