@@ -9,7 +9,8 @@ sub parse_config
 {
   my $config_file = $_[0];
   my (%settings, @setting, $line);
-  open(SETTINGS, "<$config_file") || warn "Could not open $config_file: $!\n";
+  open(SETTINGS, "<", "$config_file") || warn "Could not open $config_file: $!\n";
+  return if (tell(SETTINGS) == -1);
   while(<SETTINGS>)
   {
     chomp($line = $_);

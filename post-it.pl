@@ -5,7 +5,6 @@
 #######################################
 #######################################
 #                                     #
-# TODO: add removing - match and pos  #
 # TODO: add limit                     #
 # TODO: command line arguments        #
 # TODO: config file                   #
@@ -36,7 +35,7 @@ sub command
   {
     if (not $todo_ref->{$info{'ident'}})
     {
-      print "No to-do list in memory, attempting to load\n";
+      print "No to-do list in memory for $info{'ident'}, attempting to load\n";
       if (-e "$info{'ident'}\.todo")
       {
         # load todo list
@@ -46,7 +45,8 @@ sub command
         {
           push(@{$todo_ref->{$info{'ident'}}}, $_);
         }
-        close(TODO)
+        close(TODO);
+        print "Loaded todo list for $info{'ident'}\n";
       }
       else
       {
@@ -75,6 +75,11 @@ sub command
         $$irc->yield('privmsg', $info{'nick'}, "$info{'nick'}'s to-do list:");
         for (my $i = 0; $i < @{$todo_ref->{$info{'ident'}}}; $i++)
         {
+          if ($i > ($info{'limit'} - 1))
+          {
+            $$irc->yield('privmsg', $info{'nick'}, "---Limit reached.---");
+            return;
+          }
           $$irc->yield('privmsg', $info{'nick'}, "$i: ${$todo_ref->{$info{'ident'}}}[$i]");
         }
       }
@@ -124,14 +129,15 @@ sub command
     elsif ($command =~ /^!todo removepos (\d+)/)
     {
       return if not ($todo_ref->{$info{'ident'}});
-      if ($1 < @{$todo_ref->{$info{'ident'}}})
+      if ($1 > $#{$todo_ref->{$info{'ident'}}})
       {
-        $$irc->yield('privmsg', $info{'channel'}, "Index $1 is larger than your todo list.");
+        $$irc->yield('privmsg', $info{'channel'}, "Index $1 is larger than the last index of your todo list ($#{$todo_ref->{$info{'ident'}}}) items.");
         return;
       }
       else
       {
-        splice(@{$todo_ref{$info{'ident'}}}, $1, 1);
+        my $removed = ${$todo_ref->{$info{'ident'}}}[$1];
+        splice(@{$todo_ref->{$info{'ident'}}}, $1, 1);
         open (TODO, ">", "$info{'ident'}.todo") || warn "Could not open to-to list file: $!\n";
         return if (tell(TODO) == -1);
         foreach my $entry (@{$todo_ref->{$info{'ident'}}})
@@ -140,7 +146,7 @@ sub command
           print "Writing $entry";
         }
         close(TODO);
-        $$irc->yield('privmsg', $info{'channel'}, "Removed ${$todo_ref->{$ident{'ident'}}}[$1]");
+        $$irc->yield('privmsg', $info{'nick'}, "Removed: $removed");
       }
     }
   }
@@ -178,6 +184,7 @@ sub bot_start
   $config{'server'} = "irc.segfault.net.nz" if not $config{'server'};
   $config{'port'} = "6668" if not $config{'port'};
   $config{'channel'} = "#bots" if not $config{'channel'};
+  $config{'limit'} = 5 if not $config{'limit'};
   print "Connecting...\n";
   $irc->yield(register => "all");
   $irc->yield(
@@ -222,7 +229,7 @@ sub on_public
   {
     my @user = (split(/!/, $who));
     my $channel = $where->[0];
-    my %info_to_pass = ('nick' => $user[0], 'ident' => $user[1], 'channel' => $channel, 'command' => $msg);
+    my %info_to_pass = ('nick' => $user[0], 'ident' => $user[1], 'channel' => $channel, 'command' => $msg, 'limit' => $config{'limit'});
     command(\%todo, \$irc, %info_to_pass);
   }
 }
@@ -233,7 +240,7 @@ sub on_msg
   my ($kernel, $who, $where, $msg) = @_[KERNEL, ARG0, ARG1, ARG2];
   my @user = (split(/!/, $who));
   my $channel = $where->[0];
-  my %info_to_pass = ('nick' => $user[0], 'ident' => $user[1], 'channel' => $user([0]), 'command' => $msg);
+  my %info_to_pass = ('nick' => $user[0], 'ident' => $user[1], 'channel' => $user[0], 'command' => $msg, 'limit' => $config{'limit'});
   command(\%todo, \$irc, %info_to_pass);
 }
 
