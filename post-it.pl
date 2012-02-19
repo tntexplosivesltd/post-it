@@ -2,17 +2,6 @@
 # See LICENCE for licence details
 # Or go to http://files.entropy.net.nz/LICENCE
 
-#######################################
-#######################################
-#                                     #
-# TODO: add limit                     #
-# TODO: command line arguments        #
-# TODO: config file                   #
-#                                     #
-#######################################
-#######################################
-
-
 use warnings;
 use strict;
 use POE;
@@ -20,6 +9,13 @@ use POE::Component::IRC;
 use utils;
 
 my ($server, $port, $ownernick, $irc, $nickname, %config, %todo);
+my @help = ("post-it - To-do list/reminder IRC bot\n",
+"Commands:\n",
+"\n",
+"!todo list <n>          Show your to-do list, or the nth item if given.\n",
+"!todo add <reminder>    Add <reminder> to your list\n",
+"!todo remove <text>     Remove all reminders containing <text>\n",
+"!todo removepos <n>     Remove remonder at position <n>\n");
 
 sub command
 {
@@ -51,7 +47,6 @@ sub command
       else
       {
         print "No list exists.\n";
-        return;
       }
     }
 
@@ -64,7 +59,7 @@ sub command
         {
           my $index = $2;
           $index = 0 if $2 < 0;
-          $index = (@{$todo_ref->{$info{'ident'}}} - 1) if $2 > @{$todo_ref->{$info{'ident'}}};
+          $index = (scalar(@{$todo_ref->{$info{'ident'}}}) - 1) if $2 > @{$todo_ref->{$info{'ident'}}};
           $$irc->yield('privmsg', $info{'nick'}, "Item no. $index: ${$todo_ref->{$info{'ident'}}}[$index]");
         }
       }
@@ -72,7 +67,8 @@ sub command
       {
         # all lines
         return if not $todo_ref->{$info{'ident'}};
-        $$irc->yield('privmsg', $info{'nick'}, "$info{'nick'}'s to-do list:");
+        return if ($#{$todo_ref->{$info{'ident'}}} < 0);
+        $$irc->yield('privmsg', $info{'nick'}, "$info{'nick'}'s to-do list: $#{$todo_ref->{$info{'ident'}}}");
         for (my $i = 0; $i < @{$todo_ref->{$info{'ident'}}}; $i++)
         {
           if ($i > ($info{'limit'} - 1))
@@ -106,8 +102,9 @@ sub command
       {
         if (${$todo_ref->{$info{'ident'}}}[$i] =~ /$1/)
         {
-          print "Will remove ${$todo_ref->{$info{'ident'}}}[$i]\n";
-          push(@removes, ${$todo_ref->{$info{'ident'}}}[$i]);
+          chomp(my $remove = ${$todo_ref->{$info{'ident'}}}[$i]);
+          print "Will remove $remove\n";
+          push(@removes, $remove);
           splice(@{$todo_ref->{$info{'ident'}}}, $i, 1);
           $i--;
         }
@@ -126,6 +123,7 @@ sub command
       }
     }
 
+    # remove at position
     elsif ($command =~ /^!todo removepos (\d+)/)
     {
       return if not ($todo_ref->{$info{'ident'}});
@@ -147,6 +145,14 @@ sub command
         }
         close(TODO);
         $$irc->yield('privmsg', $info{'nick'}, "Removed: $removed");
+      }
+    }
+
+    elsif ($command =~ /^!todo help/)
+    {
+      foreach my $line (@help)
+      {
+        $$irc->yield('privmsg', $info{'nick'}, "$line");
       }
     }
   }
@@ -198,11 +204,11 @@ sub bot_start
   );
 }
 
-# The bot has successfully connected to a server. Wait for joining instructions
+# The bot has successfully connected to a server. Join the configured channel
 sub on_connect
 {
   print "Successfully connected.\n";
-  print "Connecting to $config{'channel'}\n";
+  print "Joining $config{'channel'}\n";
   $irc->yield(join => $config{'channel'});
 }
 
