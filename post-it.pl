@@ -49,99 +49,31 @@ sub command
     # todo list
     if ($command =~ /^!todo( list)* *(\d+)*$/)
     {
-      if ($2)
+      if ($2 ne "")
       {
-        if ($todo_ref->{$info{'ident'}})
-        {
-          my $index = $2;
-          $index = 0 if $2 < 0;
-          $index = (scalar(@{$todo_ref->{$info{'ident'}}}) - 1) if $2 > @{$todo_ref->{$info{'ident'}}};
-          $$irc->yield('privmsg', $info{'nick'}, "Item no. $index: ${$todo_ref->{$info{'ident'}}}[$index]");
-        }
+        listone($todo_ref, $irc, $2 ,%info)
       }
       else
       {
-        # all lines
-        return if not $todo_ref->{$info{'ident'}};
-        return if ($#{$todo_ref->{$info{'ident'}}} < 0);
-        $$irc->yield('privmsg', $info{'nick'}, "$info{'nick'}'s to-do list: $#{$todo_ref->{$info{'ident'}}}");
-        for (my $i = 0; $i < @{$todo_ref->{$info{'ident'}}}; $i++)
-        {
-          if ($i > ($info{'limit'} - 1))
-          {
-            $$irc->yield('privmsg', $info{'nick'}, "---Limit reached.---");
-            return;
-          }
-          $$irc->yield('privmsg', $info{'nick'}, "$i: ${$todo_ref->{$info{'ident'}}}[$i]");
-        }
+        listall($todo_ref, $irc, %info);
       }
     }
     # add to list
     elsif ($command =~ /^!todo add (.+)$/)
     {
-      push(@{$todo_ref->{$info{'ident'}}}, $1) if ($todo_ref->{$info{'ident'}});
-      open(TODO, ">>", "$info{'ident'}.todo") || warn "Could not open to-do list file: $!\n";
-      return if (tell(TODO) == -1);
-      print "Writing $1 to $info{'ident'}'s list\n";
-      print TODO "$1\n";
-      close(TODO);
-      $$irc->yield('privmsg', $info{'channel'}, "Added!");
+      add($todo_ref, $irc, %info);
     }
 
     #todo remove
     elsif ($command =~ /^!todo remove (.+)$/)
     {
-      my @removes;
-      my @removes_indices;
-      # find items to remove
-      for (my $i = 0; $i < @{$todo_ref->{$info{'ident'}}}; $i++)
-      {
-        if (${$todo_ref->{$info{'ident'}}}[$i] =~ /$1/)
-        {
-          chomp(my $remove = ${$todo_ref->{$info{'ident'}}}[$i]);
-          print "Will remove $remove\n";
-          push(@removes, $remove);
-          splice(@{$todo_ref->{$info{'ident'}}}, $i, 1);
-          $i--;
-        }
-      }
-      if (@removes)
-      {
-        open (TODO, ">", "$info{'ident'}.todo") || warn "Could not open to-to list file: $!\n";
-        return if (tell(TODO) == -1);
-        foreach my $entry (@{$todo_ref->{$info{'ident'}}})
-        {
-          print TODO "$entry";
-          print "Writing $entry";
-        }
-        close(TODO);
-        $$irc->yield('privmsg', $info{'nick'}, "Removed: ".join(", ", @removes));
-      }
+      remove($todo_ref, $irc, %info);
     }
 
     # remove at position
     elsif ($command =~ /^!todo removepos (\d+)/)
     {
-      return if not ($todo_ref->{$info{'ident'}});
-      if ($1 > $#{$todo_ref->{$info{'ident'}}})
-      {
-        $$irc->yield('privmsg', $info{'channel'}, "Index $1 is larger than the last index of your todo list ($#{$todo_ref->{$info{'ident'}}}) items.");
-        return;
-      }
-      else
-      {
-        my $removed = ${$todo_ref->{$info{'ident'}}}[$1];
-        splice(@{$todo_ref->{$info{'ident'}}}, $1, 1);
-        open (TODO, ">", "$info{'ident'}.todo") || warn "Could not open to-to list file: $!\n";
-        return if (tell(TODO) == -1);
-        foreach my $entry (@{$todo_ref->{$info{'ident'}}})
-        {
-          print TODO "$entry";
-          print "Writing $entry";
-        }
-        close(TODO);
-        $$irc->yield('privmsg', $info{'nick'}, "Removed: $removed");
-      }
+      removepos($todo_ref, $irc, %info);
     }
 
     # get help from the bot
@@ -155,6 +87,111 @@ sub command
   }
 }
 
+# add to the todo list
+sub add
+{
+  my ($todo_ref, $irc, %info) = @_;
+  push(@{$todo_ref->{$info{'ident'}}}, $1) if ($todo_ref->{$info{'ident'}});
+  open(TODO, ">>", "$info{'ident'}.todo") || warn "Could not open to-do list file: $!\n";
+  return if (tell(TODO) == -1);
+  print "Writing $1 to $info{'ident'}'s list\n";
+  print TODO "$1\n";
+  close(TODO);
+  $$irc->yield('privmsg', $info{'channel'}, "Added!");
+}
+
+# list all items in todo list
+sub listall
+{
+  my ($todo_ref, $irc, %info) = @_;
+  # all lines
+  return if not $todo_ref->{$info{'ident'}};
+  return if ($#{$todo_ref->{$info{'ident'}}} < 0);
+  $$irc->yield('privmsg', $info{'nick'}, "$info{'nick'}'s to-do list: $#{$todo_ref->{$info{'ident'}}}");
+  for (my $i = 0; $i < @{$todo_ref->{$info{'ident'}}}; $i++)
+  {
+    if ($i > ($info{'limit'} - 1))
+    {
+      $$irc->yield('privmsg', $info{'nick'}, "---Limit reached.---");
+      return;
+    }
+    $$irc->yield('privmsg', $info{'nick'}, "$i: ${$todo_ref->{$info{'ident'}}}[$i]");
+  }
+}
+
+# list nth item in todo list
+sub listone
+{
+  my ($todo_ref, $irc, $index, %info) = @_;
+  if ($todo_ref->{$info{'ident'}})
+  {
+    $index = 0 if $index < 0;
+    $index = $#{$todo_ref->{$info{'ident'}}} if $index > $#{$todo_ref->{$info{'ident'}}};
+    return if $index < 0;
+    $$irc->yield('privmsg', $info{'nick'}, "Item no. $index: ${$todo_ref->{$info{'ident'}}}[$index]");
+  }
+}
+
+# remove all matvhing entries
+sub remove
+{
+  my ($todo_ref, $irc, %info) = @_;
+  my @removes;
+  my @removes_indices;
+  # find items to remove
+  for (my $i = 0; $i < @{$todo_ref->{$info{'ident'}}}; $i++)
+  {
+    if (${$todo_ref->{$info{'ident'}}}[$i] =~ /$1/)
+    {
+      chomp(my $remove = ${$todo_ref->{$info{'ident'}}}[$i]);
+      print "Will remove $remove\n";
+      push(@removes, $remove);
+      splice(@{$todo_ref->{$info{'ident'}}}, $i, 1);
+      $i--;
+    }
+  }
+  if (@removes)
+  {
+    open (TODO, ">", "$info{'ident'}.todo") || warn "Could not open to-to list file: $!\n";
+    return if (tell(TODO) == -1);
+    foreach my $entry (@{$todo_ref->{$info{'ident'}}})
+    {
+      print TODO "$entry";
+      print "Writing $entry";
+    }
+    close(TODO);
+    $$irc->yield('privmsg', $info{'nick'}, "Removed: ".join(", ", @removes));
+  }
+}
+
+sub removepos
+{
+  my ($todo_ref, $irc, %info) = @_;
+  return if not ($todo_ref->{$info{'ident'}});
+  if ($1 > $#{$todo_ref->{$info{'ident'}}})
+  {
+    $$irc->yield('privmsg', $info{'channel'}, "Index $1 is larger than the last index of your todo list ($#{$todo_ref->{$info{'ident'}}}) items.");
+    return;
+  }
+  else
+  {
+    my $removed = ${$todo_ref->{$info{'ident'}}}[$1];
+    splice(@{$todo_ref->{$info{'ident'}}}, $1, 1);
+    open (TODO, ">", "$info{'ident'}.todo") || warn "Could not open to-to list file: $!\n";
+    return if (tell(TODO) == -1);
+    foreach my $entry (@{$todo_ref->{$info{'ident'}}})
+    {
+      print TODO "$entry";
+      print "Writing $entry";
+    }
+    close(TODO);
+    $$irc->yield('privmsg', $info{'nick'}, "Removed: $removed");
+  }
+}
+
+#############################
+####### IRC functions #######
+############################
 # The bot session has started. Select a nickname. Connect to a server.
 sub bot_start
 {
