@@ -8,10 +8,10 @@ use POE;
 use POE::Component::IRC;
 use utils;
 
-my ($server, $port, $ownernick, $irc, $nickname, %config, %todo);
+
+my ($irc, $server, $port, $ownernick, $nickname, %config, %todo);
 my @help = ("post-it - To-do list/reminder IRC bot\n",
 "Commands:\n",
-"\n",
 "!todo list <n>          Show your to-do list, or the nth item if given.\n",
 "!todo add <reminder>    Add <reminder> to your list\n",
 "!todo remove <text>     Remove all reminders containing <text>\n",
@@ -20,10 +20,6 @@ my @help = ("post-it - To-do list/reminder IRC bot\n",
 sub command
 {
   my ($todo_ref, $irc, %info) = @_;
-  for (keys %info)
-  {
-    print "$_: $info{$_}\n";
-  }
   my $command = $info{'command'};
 
   # !todo....
@@ -148,6 +144,7 @@ sub command
       }
     }
 
+    # get help from the bot
     elsif ($command =~ /^!todo help/)
     {
       foreach my $line (@help)
@@ -158,28 +155,7 @@ sub command
   }
 }
 
-
-# Create the component that will represent an IRC network.
-$irc = POE::Component::IRC->spawn();
-
-# Create the bot session.  The new() call specifies the events the bot
-# knows about and the functions that will handle those events.
-POE::Session->create(
-  inline_states => {
-    _start            => \&bot_start,
-    irc_001           => \&on_connect,
-    irc_disconnected  => \&on_disconnect,
-    irc_socketerr     => \&on_socket_error,
-    irc_public        => \&on_public,
-    irc_msg           => \&on_msg,
-  },
-);
-
-$poe_kernel->run();
-
-
-# The bot session has started.  Register this bot with the "magnet"
-# IRC component.  Select a nickname.  Connect to a server.
+# The bot session has started. Select a nickname. Connect to a server.
 sub bot_start
 {
   %config = utils::parse_config("./settings.conf");
@@ -212,12 +188,14 @@ sub on_connect
   $irc->yield(join => $config{'channel'});
 }
 
+# The bot has disconnected from the server, exit.
 sub on_disconnect
 {
   print "Disconnected from server\n";
   exit 0;
 }
 
+# Socket error, print the error and exit.
 sub on_socket_error
 {
   my $error = $_[ARG0];
@@ -225,8 +203,8 @@ sub on_socket_error
   exit 0;
 }
 
-# actual communication stuff
 
+# actual communication stuff
 # The bot has received a public message. Print and log it
 sub on_public
 {
@@ -249,5 +227,24 @@ sub on_msg
   my %info_to_pass = ('nick' => $user[0], 'ident' => $user[1], 'channel' => $user[0], 'command' => $msg, 'limit' => $config{'limit'});
   command(\%todo, \$irc, %info_to_pass);
 }
+
+
+# Create the component that will represent an IRC network.
+$irc = POE::Component::IRC->spawn();
+
+# Create the bot session.  The new() call specifies the events the bot
+# knows about and the functions that will handle those events.
+POE::Session->create(
+  inline_states => {
+    _start            => \&bot_start,
+    irc_001           => \&on_connect,
+    irc_disconnected  => \&on_disconnect,
+    irc_socketerr     => \&on_socket_error,
+    irc_public        => \&on_public,
+    irc_msg           => \&on_msg,
+  },
+);
+
+$poe_kernel->run();
 
 exit 0;
