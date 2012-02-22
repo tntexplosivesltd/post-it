@@ -35,6 +35,7 @@ sub command
         return if (tell(TODO) == -1);
         while(<TODO>)
         {
+          chomp($_);
           push(@{$todo_ref->{$info{'ident'}}}, $_);
         }
         close(TODO);
@@ -51,11 +52,11 @@ sub command
     {
       if ($2 ne "")
       {
-        listone($todo_ref, $irc, $2 ,%info)
+        list($todo_ref, $irc, $2 ,%info)
       }
       else
       {
-        listall($todo_ref, $irc, %info);
+        list($todo_ref, $irc, 0, %info);
       }
     }
     # add to list
@@ -97,20 +98,22 @@ sub add
   print "Writing $1 to $info{'ident'}'s list\n";
   print TODO "$1\n";
   close(TODO);
-  $$irc->yield('privmsg', $info{'channel'}, "Added!");
 }
 
 # list all items in todo list
-sub listall
+sub list
 {
-  my ($todo_ref, $irc, %info) = @_;
+  my ($todo_ref, $irc, $index, %info) = @_;
   # all lines
   return if not $todo_ref->{$info{'ident'}};
   return if ($#{$todo_ref->{$info{'ident'}}} < 0);
-  $$irc->yield('privmsg', $info{'nick'}, "$info{'nick'}'s to-do list: $#{$todo_ref->{$info{'ident'}}}");
-  for (my $i = 0; $i < @{$todo_ref->{$info{'ident'}}}; $i++)
+  $index = 0 if $index < 0;
+  $index = $#{$todo_ref->{$info{'ident'}}} if $index > $#{$todo_ref->{$info{'ident'}}};
+  
+  $$irc->yield('privmsg', $info{'nick'}, "$info{'nick'}'s to-do list: (" . ($#{$todo_ref->{$info{'ident'}}}+1) . " items)");
+  for (my $i = $index; $i < @{$todo_ref->{$info{'ident'}}}; $i++)
   {
-    if ($i > ($info{'limit'} - 1))
+    if ($i > ($index + $info{'limit'} - 1))
     {
       $$irc->yield('privmsg', $info{'nick'}, "---Limit reached.---");
       return;
@@ -143,7 +146,8 @@ sub remove
   {
     if (${$todo_ref->{$info{'ident'}}}[$i] =~ /$1/)
     {
-      chomp(my $remove = ${$todo_ref->{$info{'ident'}}}[$i]);
+      my $remove = ${$todo_ref->{$info{'ident'}}}[$i];
+      chomp $remove;
       print "Will remove $remove\n";
       push(@removes, $remove);
       splice(@{$todo_ref->{$info{'ident'}}}, $i, 1);
@@ -156,7 +160,7 @@ sub remove
     return if (tell(TODO) == -1);
     foreach my $entry (@{$todo_ref->{$info{'ident'}}})
     {
-      print TODO "$entry";
+      print TODO "$entry\n";
       print "Writing $entry";
     }
     close(TODO);
@@ -181,8 +185,8 @@ sub removepos
     return if (tell(TODO) == -1);
     foreach my $entry (@{$todo_ref->{$info{'ident'}}})
     {
-      print TODO "$entry";
-      print "Writing $entry";
+      print TODO "$entry\n";
+      print "Writing $entry\n";
     }
     close(TODO);
     $$irc->yield('privmsg', $info{'nick'}, "Removed: $removed");
