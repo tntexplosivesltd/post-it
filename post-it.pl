@@ -174,7 +174,7 @@ sub removepos
   return if not ($todo_ref->{$info{'ident'}});
   if ($1 > $#{$todo_ref->{$info{'ident'}}})
   {
-    $$irc->yield('privmsg', $info{'channel'}, "Index $1 is larger than the last index of your todo list ($#{$todo_ref->{$info{'ident'}}}) items.");
+    $$irc->yield('privmsg', $info{'channel'}, "Index $1 is larger than the last index of your todo list (" . ($#{$todo_ref->{$info{'ident'}}}) + 1) . "items.");
     return;
   }
   else
